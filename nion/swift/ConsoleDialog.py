@@ -5,12 +5,25 @@ import copy
 import gettext
 import io
 import re
-import rlcompleter
+#import rlcompleter
 import sys
+import os
+
+# 3rd party libraries
+import jedi
+from jedi import Interpreter
+jedi.set_debug_function(speed=False)
+jedi.settings.add_bracket_after_function = True
+jedi.settings.case_insensitive_completion = False
+jedi.settings.no_completion_duplicates = True
+jedi.settings.fast_parser = False
+jedi.settings.auto_import_modules.append('Facade')
+jedi.settings.additional_dynamic_modules.append(os.path.join(os.path.dirname(__file__), 'Facade.py'))
 
 # local libraries
 from nion.ui import Dialog
 from nion.ui import Widgets
+from nion.swift import Facade
 
 _ = gettext.gettext
 
@@ -39,7 +52,6 @@ class ConsoleWidget(Widgets.CompositeWidgetBase):
 
     def __init__(self, ui, locals=None, properties=None):
         super().__init__(ui.create_column_widget())
-
         properties = properties if properties is not None else dict()
         properties["stylesheet"] = "background: black; color: white; font-family: Monaco, Courier, monospace"
 
@@ -200,38 +212,32 @@ class ConsoleWidget(Widgets.CompositeWidgetBase):
 
         if is_cursor_on_last_line and is_cursor_on_last_column and key.is_tab:
             partial_command = self.__get_partial_command()
-            terms = list()
-            completer = rlcompleter.Completer(namespace=self.console.locals)
-            index = 0
-            delims = " \t\n`~!@#$%^&*()-=+[{]}\\|;:\'\",<>/?"
-            rx = "[" + re.escape("".join(delims)) + "]"
-            split_commands = re.split(rx, partial_command)
-            if len(split_commands) > 0:
-                completion_term = split_commands[-1]
-                while True:
-                    term = completer.complete(completion_term, index)
-                    if term is None:
-                        break
-                    index += 1
-                    if not term.startswith(completion_term + "__"):
-                        terms.append(term)
-                if len(terms) == 1:
-                    completed_command = partial_command[:partial_command.rfind(completion_term)] + terms[0]
-                    prompt = self.continuation_prompt if self.__incomplete else self.prompt
-                    self.__text_edit_widget.move_cursor_position("start_para", "move")
-                    self.__text_edit_widget.move_cursor_position("end_para", "keep")
-                    self.__text_edit_widget.insert_text("{}{}".format(prompt, completed_command))
+            completions = list()
+            script = Interpreter(partial_command, [self.console.locals])
+            completions_raw = script.completions()
+            if len(completions_raw) > 0:
+                for completion in completions_raw:
+                    if not completion.name.startswith("_"):
+                        completions.append(completion)
+                if len(completions) == 1:
+                    #completed_command = partial_command + completions[0].complete
+                    #prompt = self.continuation_prompt if self.__incomplete else self.prompt
+                    #self.__text_edit_widget.move_cursor_position("start_para", "move")
+                    #self.__text_edit_widget.move_cursor_position("end_para", "keep")
+                    #self.__text_edit_widget.insert_text("{}{}".format(prompt, completed_command))
                     self.__text_edit_widget.move_cursor_position("end")
+                    self.__text_edit_widget.insert_text(completions[0].complete)
                     self.__last_position = copy.deepcopy(self.__cursor_position)
-                elif len(terms) > 1:
-                    common_prefix = get_common_prefix(terms)
+                elif len(completions) > 1:
+                    common_prefix = get_common_prefix([completion.complete for completion in completions])
                     prompt = self.continuation_prompt if self.__incomplete else self.prompt
                     self.__text_edit_widget.move_cursor_position("end")
                     self.__text_edit_widget.set_text_color("brown")
-                    self.__text_edit_widget.append_text("   ".join(terms) + "\n")
+                    self.__text_edit_widget.append_text("   ".join([completion.name_with_symbols for
+                                                                    completion in completions]) + "\n")
                     self.__text_edit_widget.move_cursor_position("end")
                     self.__text_edit_widget.set_text_color("white")
-                    self.__text_edit_widget.insert_text("{}{}".format(prompt, common_prefix))
+                    self.__text_edit_widget.insert_text("{}{}".format(prompt, partial_command + common_prefix))
                     self.__text_edit_widget.move_cursor_position("end")
                     self.__last_position = copy.deepcopy(self.__cursor_position)
             return True
