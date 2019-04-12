@@ -17,8 +17,9 @@ jedi.settings.add_bracket_after_function = True
 jedi.settings.case_insensitive_completion = False
 jedi.settings.no_completion_duplicates = True
 jedi.settings.fast_parser = False
-jedi.settings.auto_import_modules.append('Facade')
-jedi.settings.additional_dynamic_modules.append(os.path.join(os.path.dirname(__file__), 'Facade.py'))
+# workaround for the @property bug (see jedi issues #1299, #1305, #1259)
+from jedi.evaluate.compiled import access
+access.ALLOWED_DESCRIPTOR_ACCESS += (property,)
 
 # local libraries
 from nion.ui import Dialog
