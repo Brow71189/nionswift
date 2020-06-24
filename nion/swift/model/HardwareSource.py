@@ -750,20 +750,21 @@ class HardwareSource(Observable.Observable):
             assert data_element is not None
             channel_id = data_element.get("channel_id")
             # find channel_index for channel_id
-            channel_index = next((data_channel.index for data_channel in self.__data_channels if data_channel.channel_id == channel_id), 0)
-            data_and_metadata = ImportExportManager.convert_data_element_to_data_and_metadata(data_element)
-            # data_and_metadata data may still point to low level code memory at this point.
-            channel_state = data_element.get("state", "complete")
-            if channel_state != "complete" and is_stopping:
-                channel_state = "marked"
-            data_shape = data_element.get("data_shape")
-            dest_sub_area = data_element.get("dest_sub_area")
-            sub_area = data_element.get("sub_area")
-            data_channel = self.__data_channels[channel_index]
-            # data_channel.update will make a copy of the data_and_metadata
-            data_channel.update(data_and_metadata, channel_state, data_shape, dest_sub_area, sub_area, view_id)
-            data_channels.append(data_channel)
-            xdatas.append(data_channel.data_and_metadata)
+            channel_index = next((data_channel.index for data_channel in self.__data_channels if data_channel.channel_id == channel_id), None)
+            if channel_index is not None:
+                data_and_metadata = ImportExportManager.convert_data_element_to_data_and_metadata(data_element)
+                # data_and_metadata data may still point to low level code memory at this point.
+                channel_state = data_element.get("state", "complete")
+                if channel_state != "complete" and is_stopping:
+                    channel_state = "marked"
+                data_shape = data_element.get("data_shape")
+                dest_sub_area = data_element.get("dest_sub_area")
+                sub_area = data_element.get("sub_area")
+                data_channel = self.__data_channels[channel_index]
+                # data_channel.update will make a copy of the data_and_metadata
+                data_channel.update(data_and_metadata, channel_state, data_shape, dest_sub_area, sub_area, view_id)
+                data_channels.append(data_channel)
+                xdatas.append(data_channel.data_and_metadata)
         # update channel buffers with processors
         for data_channel in self.__data_channels:
             src_channel_index = data_channel.src_channel_index
